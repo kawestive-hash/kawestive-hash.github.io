@@ -262,12 +262,19 @@ h1{margin:0;font:italic 500 clamp(40px,min(9vw,11vh),96px)/.95 var(--serif);text
     const totH = lines.reduce((a, l) => a + l.s * fs * LH, 0);
     fs *= Math.min(CW * (aspect < 1 ? 0.9 : 0.84) / maxW, CH * 0.6 / totH);
     octx.fillStyle = '#fff'; octx.textAlign = 'center'; octx.textBaseline = 'middle';
-    const bands = [];
+    const bands = [], words = [];
     let y = CH / 2 - (totH * fs / 100) / 2;
-    lines.forEach(l => {
+    lines.forEach((l, li) => {
       const z = fs * l.s; octx.font = `italic 600 ${z}px ${FONT}`;
       const w = octx.measureText(l.t).width;
       bands.push({ y0: y, y1: y + z * LH, x0: CW / 2 - w / 2, w });
+      // where each word sits along the writing sweep, so its note lands when it lights up
+      let pre = '';
+      l.t.split(' ').forEach(word => {
+        const a = octx.measureText(pre).width, b = octx.measureText(pre + word).width;
+        words.push({ word, ord: (li + ((a + b) / 2) / w) / lines.length });
+        pre += word + ' ';
+      });
       octx.fillText(l.t, CW / 2, y + z * LH / 2 + z * 0.04);
       y += z * LH;
     });
@@ -296,7 +303,7 @@ h1{margin:0;font:italic 500 clamp(40px,min(9vw,11vh),96px)/.95 var(--serif);text
         ord[i] = po[s];
       } else { halo(out, i, vh, vw); ord[i] = Math.random(); }
     }
-    return { pos: out, ord };
+    return { pos: out, ord, words };
   }
 
   function heart() {
@@ -377,6 +384,9 @@ h1{margin:0;font:italic 500 clamp(40px,min(9vw,11vh),96px)/.95 var(--serif);text
     const dry = ctx.createGain(); dry.gain.value = 0.55; dry.connect(master);
     const bus = ctx.createGain(); bus.connect(dry); bus.connect(conv);
     const bells = ctx.createGain(); bells.gain.value = 0.9; bells.connect(conv); bells.connect(dry);
+    // button sounds bypass the music fade so they are heard even before the letter opens
+    const ui = ctx.createGain(); ui.gain.value = 0.8; ui.connect(comp);
+    const uiVerb = ctx.createGain(); uiVerb.gain.value = 0.25; ui.connect(uiVerb); uiVerb.connect(conv);
 
     const padF = ctx.createBiquadFilter(); padF.type = 'lowpass'; padF.frequency.value = 650; padF.Q.value = 0.5; padF.connect(bus);
     const lfo = ctx.createOscillator(), lfoG = ctx.createGain(); lfo.frequency.value = 0.07; lfoG.gain.value = 180;
@@ -388,7 +398,7 @@ h1{margin:0;font:italic 500 clamp(40px,min(9vw,11vh),96px)/.95 var(--serif);text
     // D major colours: Dmaj9, Bm9, Gmaj9, A6/9
     const CHORDS = [[50, 57, 61, 64, 66], [47, 54, 57, 61, 62], [43, 50, 54, 57, 59], [45, 52, 54, 59, 61]];
     const BELLS = [74, 76, 78, 81, 83, 86, 88, 90];
-    let ci = 0, nextChord = 0;
+    let ci = 0, nextChord = 0, opened = false;
     const CH = 8;
 
     function voice(m, t, dur, level) {
@@ -408,17 +418,27 @@ h1{margin:0;font:italic 500 clamp(40px,min(9vw,11vh),96px)/.95 var(--serif);text
       c.forEach((m, k) => voice(m, t, CH, k === 0 ? 0.05 : 0.03));
       voice(c[0] - 12, t, CH, 0.045);
     }
-    function bell(m, t, v) {
-      const f = mtof(m), g = ctx.createGain();
-      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.6);
-      g.connect(bells);
+    function bell(m, t, v, decay, out) {
+      const f = mtof(m), g = ctx.createGain(), dc = decay || 2.6;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + dc);
+      g.connect(out || bells);
       [[1, 1], [2.76, 0.28], [5.4, 0.08]].forEach(([r, a]) => {
         const o = ctx.createOscillator(), og = ctx.createGain(); o.type = 'sine'; o.frequency.value = f * r; og.gain.value = a;
-        o.connect(og); og.connect(g); o.start(t); o.stop(t + 2.7);
+        o.connect(og); og.connect(g); o.start(t); o.stop(t + dc + 0.1);
       });
     }
-    const tick = setInterval(() => {
-      if (ctx.state !== 'running') return;
+    function tick(t, freq, v) {
+      const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      s.buffer = noiseBuf; f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 6;
+      g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+      s.connect(f); f.connect(g); g.connect(ui); s.start(t, Math.random()); s.stop(t + 0.06);
+    }
+    // each phrase gets its own little melody, one note per word as the light reaches it
+    const MELO = [[62, 64, 66, 69, 71, 69, 71, 74, 73, 74], [69, 71, 74, 76, 74, 73, 71, 69], [74, 76, 78, 81, 83, 81, 83, 86]];
+    const KEY = /toi|choisie|visage|aime|Esmel/i;
+    let lastTouch = 0;
+    const loop = setInterval(() => {
+      if (ctx.state !== 'running' || !opened) return;
       while (nextChord < ctx.currentTime + 1.2) { chord(Math.max(nextChord, ctx.currentTime + 0.05)); nextChord += CH; }
     }, 400);
 
@@ -427,7 +447,7 @@ h1{margin:0;font:italic 500 clamp(40px,min(9vw,11vh),96px)/.95 var(--serif);text
       open() {
         ctx.resume && ctx.resume();
         const t = ctx.currentTime;
-        nextChord = t + 0.1;
+        nextChord = t + 0.1; opened = true;
         master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(0, t); master.gain.linearRampToValueAtTime(0.9, t + 3.5);
         bell(81, t + 0.4, 0.06); bell(86, t + 1.1, 0.05);
       },
@@ -462,8 +482,43 @@ h1{margin:0;font:italic 500 clamp(40px,min(9vw,11vh),96px)/.95 var(--serif);text
         const t = ctx.currentTime;
         master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value, t);
         master.gain.linearRampToValueAtTime(m ? 0 : 0.9, t + 0.6);
+        ui.gain.setTargetAtTime(m ? 0.0001 : 0.8, t + 0.08, 0.05);
       },
-      stop() { clearInterval(tick); }
+      words(list, k, travel, stagger) {
+        const mel = MELO[k % MELO.length], t0 = ctx.currentTime;
+        list.forEach((w, i) => {
+          const t = t0 + stagger * 0.82 * w.ord + travel * 0.66;
+          const m = mel[Math.min(mel.length - 1, i)] + (k === 2 && i === list.length - 1 ? 12 : 0);
+          if (KEY.test(w.word)) {
+            bell(m, t, 0.085, 4.2);
+            bell(m - 12, t + 0.02, 0.05, 4.5);
+            bell(m - 24, t + 0.04, 0.04, 5);
+          } else {
+            bell(m, t, 0.05, 2.4);
+          }
+        });
+      },
+      // light shimmer when the viewer brushes the words; pitch follows the finger, left low, right high
+      touch(x) {
+        const t = ctx.currentTime;
+        if (t - lastTouch < 0.09) return;
+        lastTouch = t;
+        const idx = Math.max(0, Math.min(BELLS.length - 1, Math.round(x * (BELLS.length - 1) + (Math.random() - .5) * 1.5)));
+        bell(BELLS[idx] + 12, t, 0.018 + Math.random() * 0.012, 1.4);
+      },
+      arp() {
+        const t = ctx.currentTime;
+        [62, 66, 69, 73, 74, 78, 81, 86].forEach((m, i) => bell(m, t + 0.5 + i * 0.22, 0.05, 3.5));
+      },
+      click(kind) {
+        const t = ctx.currentTime + 0.01;
+        if (kind === 'open') { tick(t, 2400, 0.25); bell(74, t + 0.02, 0.09, 3, ui); bell(81, t + 0.14, 0.07, 3.2, ui); bell(50, t + 0.02, 0.06, 2.5, ui); }
+        else if (kind === 'replay') { tick(t, 2000, 0.22); [81, 78, 74, 69].forEach((m, i) => bell(m, t + i * 0.09, 0.06, 2.2, ui)); }
+        else if (kind === 'on') { tick(t, 2600, 0.2); bell(78, t + 0.02, 0.06, 1.6, ui); }
+        else if (kind === 'off') { tick(t, 1500, 0.2); }
+        else { tick(t, 3000, 0.18); bell(86, t + 0.02, 0.035, 1.2, ui); }
+      },
+      stop() { clearInterval(loop); }
     };
   }
   let heartSoundFrom = Infinity, lastBeatPh = 0;
@@ -488,7 +543,7 @@ h1{margin:0;font:italic 500 clamp(40px,min(9vw,11vh),96px)/.95 var(--serif);text
       ampTarget = 0.012;
       if (k === 2) { fuseTo(1, 5.5); audio && audio.swell(true, 5.5); }
       goTo(SHAPES.phrases[k], 3.6, 2.4, k === 0 ? 1.4 : 1.1);
-      audio && audio.sparkle(2.2, 3.6, k === 2 ? 16 : 12);
+      if (audio) { audio.words(SHAPES.phrases[k].words, k, 3.6, 2.4); audio.sparkle(2.0, 4.0, 6); }
       await wait(3.6 + 2.4 + PHRASES[k].hold); if (!alive()) return;
       if (k < 2) {
         stage = { type: 'scatter', k };
@@ -501,7 +556,7 @@ h1{margin:0;font:italic 500 clamp(40px,min(9vw,11vh),96px)/.95 var(--serif);text
     stage = { type: 'heart', k: 0 };
     finale = true; ampTarget = 0.03;
     goTo(SHAPES.heart, 4.6, 1.6, 1.6);
-    audio && audio.whoosh(4);
+    if (audio) { audio.whoosh(4); audio.arp(); }
     heartSoundFrom = now() + 4.5;
     await wait(7); if (!alive()) return;
     $('end').hidden = false;
@@ -579,6 +634,7 @@ h1{margin:0;font:italic 500 clamp(40px,min(9vw,11vh),96px)/.95 var(--serif);text
     lastBeatPh = bph;
 
     const T0 = t - tw.start, D = tw.dur;
+    let nearCount = 0;
     for (let i = 0; i < N; i++) {
       const i3 = i * 3, i2 = i * 2;
       let p = (T0 - delay[i]) / D; p = p < 0 ? 0 : p > 1 ? 1 : p;
@@ -591,7 +647,7 @@ h1{margin:0;font:italic 500 clamp(40px,min(9vw,11vh),96px)/.95 var(--serif);text
       let tx = 0, ty = 0;
       if (touchOn) {
         const dx = bx - ptr.wx, dy = by - ptr.wy, d2 = dx * dx + dy * dy;
-        if (d2 < R2) { const d = Math.sqrt(d2) + 1e-4, q = 1 - d / R; tx = dx / d * q * q * push; ty = dy / d * q * q * push; }
+        if (d2 < R2) { nearCount++; const d = Math.sqrt(d2) + 1e-4, q = 1 - d / R; tx = dx / d * q * q * push; ty = dy / d * q * q * push; }
       }
       disp[i2] += (tx - disp[i2]) * 0.09; disp[i2+1] += (ty - disp[i2+1]) * 0.09;
 
@@ -600,6 +656,7 @@ h1{margin:0;font:italic 500 clamp(40px,min(9vw,11vh),96px)/.95 var(--serif);text
       pos[i3+2] = bz + Math.sin(t * freq[i3+2] + phs[i3+2]) * amp;
     }
     posAttr.needsUpdate = true;
+    if (audio && touchOn && stage.type === 'phrase' && nearCount > 30 && t - ptr.last < 0.12) audio.touch((ptr.nx + 1) / 2);
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
@@ -620,23 +677,29 @@ h1{margin:0;font:italic 500 clamp(40px,min(9vw,11vh),96px)/.95 var(--serif);text
     buildShapes();
     const btn = $('start'); btn.disabled = false;
     btn.addEventListener('click', () => {
-      try { audio = makeAudio(); if (audio) { audio.open(); $('snd').hidden = false; } } catch (e) { audio = null; }
+      ensureAudio();
+      if (audio) { audio.click('open'); audio.open(); $('snd').hidden = false; }
       $('overlay').classList.add('gone'); play();
     });
     if (location.hash === '#auto') { $('overlay').classList.add('gone'); play(); }
   });
-  $('replay').addEventListener('click', () => { audio && audio.ctx.resume && audio.ctx.resume(); replay(); });
+  function ensureAudio() {
+    try { if (!audio) audio = makeAudio(); if (audio && audio.ctx.resume) audio.ctx.resume(); } catch (e) { audio = null; }
+  }
+  $('replay').addEventListener('click', () => { ensureAudio(); audio && audio.click('replay'); replay(); });
   $('snd').addEventListener('click', e => {
     if (!audio) return;
     const b = e.currentTarget, m = b.getAttribute('aria-pressed') !== 'true';
     b.setAttribute('aria-pressed', String(m));
     b.setAttribute('aria-label', m ? 'Remettre le son' : 'Couper le son');
+    audio.click(m ? 'off' : 'on');
     audio.mute(m);
   });
 
   const fsBtn = $('fs');
   if (!document.fullscreenEnabled) fsBtn.hidden = true;
   fsBtn.addEventListener('click', () => {
+    ensureAudio(); audio && audio.click('fs');
     try {
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       else document.documentElement.requestFullscreen().catch(() => {});
