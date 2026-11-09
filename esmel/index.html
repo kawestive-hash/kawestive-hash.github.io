@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Lettre de lumière</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,500;1,600&family=Jost:wght@400;500&display=swap">
+<style>
+/* Plein écran nocturne : deux nuages qui se cherchent, l'interface s'efface devant la lumière. */
+:root{
+  --night:#04050b;
+  --ink:#f4ead9;
+  --ink-dim:rgba(244,234,217,.6);
+  --line:rgba(244,234,217,.26);
+  --blue:#7fa6ff;
+  --rose:#ffc2a2;
+  --amber:#ffb054;
+  --serif:"Cormorant Garamond","Iowan Old Style",Georgia,serif;
+  --sans:"Jost","Avenir Next","Segoe UI",system-ui,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--night);color:var(--ink);overflow:hidden;font-family:var(--sans);-webkit-tap-highlight-color:transparent}
+#scene{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.vignette{position:fixed;inset:0;pointer-events:none;background:radial-gradient(120% 95% at 50% 46%,transparent 52%,rgba(0,0,0,.7) 100%)}
+
+.overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:22px;text-align:center;
+  padding-block:0 calc(11vh + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  transition:opacity 1.8s ease}
+.overlay.gone{opacity:0;pointer-events:none}
+.eyebrow{font:500 11px/1 var(--sans);letter-spacing:.34em;text-transform:uppercase;color:var(--ink-dim);margin:0}
+h1{margin:0;font:italic 500 clamp(52px,10vw,104px)/.95 var(--serif);text-wrap:balance;
+  background:linear-gradient(95deg,var(--blue) 0%,var(--ink) 48%,var(--rose) 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hint{margin:0;max-width:34ch;font:italic 500 19px/1.4 var(--serif);color:var(--ink-dim)}
+
+.btn{font:500 12px/1 var(--sans);letter-spacing:.28em;text-transform:uppercase;color:var(--ink);
+  background:rgba(244,234,217,.04);border:1px solid var(--line);border-radius:999px;padding:16px 34px;cursor:pointer;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);transition:border-color .4s,background .4s,color .4s}
+.btn:hover{border-color:var(--amber);color:var(--amber);background:rgba(255,176,84,.06)}
+.btn:focus-visible,.icon:focus-visible{outline:2px solid var(--amber);outline-offset:4px}
+.btn[disabled]{opacity:.45;cursor:wait}
+
+.end{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;
+  padding-block:0 calc(6vh + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  animation:fade 2.4s ease both}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+
+.icon{position:fixed;top:calc(14px + env(safe-area-inset-top,0px));right:calc(14px + env(safe-area-inset-right,0px));
+  width:42px;height:42px;border-radius:50%;display:grid;place-items:center;cursor:pointer;
+  background:rgba(244,234,217,.03);border:1px solid rgba(244,234,217,.16);color:var(--ink-dim);transition:color .3s,border-color .3s}
+.icon:hover{color:var(--ink);border-color:var(--line)}
+.icon svg{width:16px;height:16px}
+
+.fallback{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:26px;text-align:center;
+  padding-block:40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  font:italic 500 clamp(26px,4.4vw,44px)/1.25 var(--serif);color:var(--ink)}
+.fallback p{margin:0;max-width:24ch;text-wrap:balance}
+@media (prefers-reduced-motion:reduce){.overlay{transition-duration:.4s}.end{animation-duration:.4s}}
+</style>
+<style>*,*::before,*::after{box-sizing:border-box}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+<canvas id="scene" aria-label="Deux nuages de lumière qui se rejoignent pour écrire un message"></canvas>
+<div class="vignette"></div>
+
+<div class="overlay" id="overlay">
+  <p class="eyebrow">Une lettre en lumière</p>
+  <h1>Pour toi</h1>
+  <p class="hint">Laisse les mots s’écrire. Effleure-les du doigt quand ils apparaissent.</p>
+  <button class="btn" id="start" type="button" disabled>Ouvrir</button>
+</div>
+
+<div class="end" id="end" hidden>
+  <button class="btn" id="replay" type="button">Revoir</button>
+</div>
+
+<button class="icon" id="fs" type="button" aria-label="Plein écran" title="Plein écran">
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M1.5 5.5v-4h4M10.5 1.5h4v4M14.5 10.5v4h-4M5.5 14.5h-4v-4"/></svg>
+</button>
+
+<div class="fallback" id="fallback" hidden>
+  <p>Parmi tout ce que j’ai vu de ce monde, c’est toi que j’ai choisie.</p>
+  <p>Mon choix n’a rien d’un hasard, il a ton visage.</p>
+  <p>Je t’aime, Esmel, et je veux te découvrir encore.</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const FONT = '"Cormorant Garamond", Georgia, serif';
+
+  const PHRASES = [
+    { hold: 5.6,
+      wide:   [{t:'Parmi tout ce que j’ai vu de ce monde,',s:1},{t:'c’est toi que j’ai choisie.',s:1.08}],
+      narrow: [{t:'Parmi tout ce que',s:1},{t:'j’ai vu de ce monde,',s:1},{t:'c’est toi',s:1.3},{t:'que j’ai choisie.',s:1}] },
+    { hold: 5.6,
+      wide:   [{t:'Mon choix n’a rien d’un hasard,',s:1},{t:'il a ton visage.',s:1.22}],
+      narrow: [{t:'Mon choix',s:1},{t:'n’a rien d’un hasard,',s:1},{t:'il a ton visage.',s:1.15}] },
+    { hold: 7.2,
+      wide:   [{t:'Je t’aime, Esmel,',s:1.5},{t:'et je veux te découvrir encore.',s:1}],
+      narrow: [{t:'Je t’aime,',s:1.4},{t:'Esmel,',s:1.4},{t:'et je veux',s:1},{t:'te découvrir encore.',s:1}] }
+  ];
+
+  let renderer;
+  try {
+    if (!window.THREE) throw new Error('no three');
+    renderer = new THREE.WebGLRenderer({ canvas: $('scene'), antialias: false, powerPreference: 'high-performance' });
+  } catch (e) {
+    $('overlay').hidden = true; $('fs').hidden = true; $('fallback').hidden = false; return;
+  }
+  const PR = Math.min(window.devicePixelRatio || 1, 2);
+  renderer.setPixelRatio(PR);
+  renderer.setClearColor(0x04050b, 1);
+
+  const scene = new THREE.Scene();
+  const CAM_Z = 10;
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+  camera.position.set(0, 0, CAM_Z);
+
+  let W = innerWidth, H = innerHeight, aspect = W / H;
+  const visH = () => 2 * CAM_Z * Math.tan(THREE.MathUtils.degToRad(25));
+
+  const N = (Math.min(W, H) < 600 || W * H < 520000) ? 11000 : 17000;
+
+  /* ---------- particle attributes ---------- */
+  const pos = new Float32Array(N * 3), base = new Float32Array(N * 3);
+  const from = new Float32Array(N * 3), to = new Float32Array(N * 3), arc = new Float32Array(N * 3);
+  const freq = new Float32Array(N * 3), phs = new Float32Array(N * 3);
+  const disp = new Float32Array(N * 2);
+  const delay = new Float32Array(N);
+  const col = new Float32Array(N * 3), size = new Float32Array(N), phase = new Float32Array(N), fuse = new Float32Array(N);
+
+  const BLUE = ['#1f47ff', '#2d63ff', '#4a86ff', '#8cbcff', '#3550e6', '#6c9eff', '#b4d4ff'];
+  const ROSE = ['#ffae8e', '#ffc596', '#ff9aa9', '#ffd8b6', '#f2a07a', '#ffcf9e', '#ffe6cf'];
+  const tmp = new THREE.Color();
+  for (let i = 0; i < N; i++) {
+    const team = i & 1;
+    const pal = team ? ROSE : BLUE;
+    tmp.set(pal[(Math.random() * pal.length) | 0]);
+    col[i*3] = tmp.r; col[i*3+1] = tmp.g; col[i*3+2] = tmp.b;
+    size[i] = 0.55 + Math.pow(Math.random(), 2.2) * 1.35;
+    phase[i] = Math.random();
+    fuse[i] = Math.random() < 0.16 ? 0.4 : (team ? 1 : 0.92);
+    for (let k = 0; k < 3; k++) { freq[i*3+k] = 0.25 + Math.random() * 0.7; phs[i*3+k] = Math.random() * 6.283; }
+  }
+
+  const uniforms = {
+    uTime: { value: 0 }, uFusion: { value: 0 }, uPR: { value: PR }, uScale: { value: 3 },
+    uAmber: { value: new THREE.Color('#ffa64a') }
+  };
+  const material = new THREE.ShaderMaterial({
+    uniforms, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    vertexShader: `
+      attribute vec3 aColor; attribute float aSize; attribute float aPhase; attribute float aFuse;
+      uniform float uTime, uFusion, uPR, uScale; uniform vec3 uAmber;
+      varying vec3 vColor; varying float vAlpha;
+      void main(){
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        float tw = 0.72 + 0.28 * sin(uTime * (1.2 + aPhase) + aPhase * 6.2831);
+        gl_PointSize = aSize * uScale * uPR * tw * (10.0 / -mv.z);
+        gl_Position = projectionMatrix * mv;
+        vec3 amber = uAmber + vec3((aPhase - 0.5) * 0.22, (aPhase - 0.5) * 0.16, (0.5 - aPhase) * 0.05);
+        vColor = mix(aColor, amber, uFusion * aFuse);
+        vAlpha = tw;
+      }`,
+    fragmentShader: `
+      varying vec3 vColor; varying float vAlpha;
+      void main(){
+        vec2 c = gl_PointCoord - 0.5;
+        float d = dot(c, c);
+        float a = exp(-d * 26.0) + 0.35 * exp(-d * 90.0);
+        if (a < 0.015) discard;
+        gl_FragColor = vec4(vColor * 1.25, min(1.0, a * vAlpha));
+      }`
+  });
+
+  const geo = new THREE.BufferGeometry();
+  const posAttr = new THREE.BufferAttribute(pos, 3); posAttr.setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute('position', posAttr);
+  geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+  geo.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
+  geo.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
+  geo.setAttribute('aFuse', new THREE.BufferAttribute(fuse, 1));
+  const points = new THREE.Points(geo, material);
+  points.frustumCulled = false;
+  scene.add(points);
+
+  /* ---------- far stars ---------- */
+  const S = 1400, sp = new Float32Array(S*3), sc = new Float32Array(S*3), ss = new Float32Array(S), sph = new Float32Array(S), sf = new Float32Array(S);
+  for (let i = 0; i < S; i++) {
+    sp[i*3] = (Math.random() - .5) * 90; sp[i*3+1] = (Math.random() - .5) * 60; sp[i*3+2] = -18 - Math.random() * 30;
+    tmp.setHSL(0.6 + Math.random() * 0.12, 0.5, 0.55 + Math.random() * 0.3);
+    sc[i*3] = tmp.r * .55; sc[i*3+1] = tmp.g * .55; sc[i*3+2] = tmp.b * .55;
+    ss[i] = 1.5 + Math.random() * 2.5; sph[i] = Math.random(); sf[i] = 0;
+  }
+  const sgeo = new THREE.BufferGeometry();
+  sgeo.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+  sgeo.setAttribute('aColor', new THREE.BufferAttribute(sc, 3));
+  sgeo.setAttribute('aSize', new THREE.BufferAttribute(ss, 1));
+  sgeo.setAttribute('aPhase', new THREE.BufferAttribute(sph, 1));
+  sgeo.setAttribute('aFuse', new THREE.BufferAttribute(sf, 1));
+  const stars = new THREE.Points(sgeo, material);
+  scene.add(stars);
+
+  /* ---------- target shapes ---------- */
+  function halo(out, i, vh, vw) {
+    const a = Math.random() * 6.283, r = 0.55 + Math.random() * 0.7;
+    out[i*3] = Math.cos(a) * vw * 0.5 * r * 1.15;
+    out[i*3+1] = Math.sin(a) * vh * 0.5 * r * 1.1;
+    out[i*3+2] = -5 + Math.random() * 6;
+  }
+
+  function clouds(near) {
+    const vh = visH(), vw = vh * aspect, out = new Float32Array(N * 3);
+    const portrait = aspect < 0.9;
+    const d = (near ? 0.17 : 0.29) * (portrait ? vh : vw);
+    const R = Math.min(vh, vw) * (portrait ? 0.24 : 0.19);
+    for (let i = 0; i < N; i++) {
+      const s = (i & 1) ? 1 : -1;
+      const cx = portrait ? 0 : s * d, cy = portrait ? -s * d : 0;
+      const u = Math.random() * 2 - 1, th = Math.random() * 6.283, rr = R * Math.pow(Math.random(), 1.7);
+      const q = Math.sqrt(1 - u * u);
+      // gentle spiral: angle twists with radius
+      const tw = th + rr / R * 2.4 * s;
+      out[i*3] = cx + Math.cos(tw) * q * rr;
+      out[i*3+1] = cy + Math.sin(tw) * q * rr * 0.85;
+      out[i*3+2] = u * rr * 0.7;
+    }
+    return { pos: out, ord: null };
+  }
+
+  const off = document.createElement('canvas');
+  const octx = off.getContext('2d', { willReadFrequently: true });
+
+  function phrase(def) {
+    const lines = aspect < 1 ? def.narrow : def.wide;
+    const CW = aspect < 1 ? 900 : 1400, CH = Math.max(380, Math.round(CW / aspect));
+    off.width = CW; off.height = CH;
+    octx.fillStyle = '#000'; octx.fillRect(0, 0, CW, CH);
+    let fs = 100; const LH = 1.16;
+    octx.font = `italic 600 ${fs}px ${FONT}`;
+    const maxW = Math.max(...lines.map(l => octx.measureText(l.t).width * l.s));
+    const totH = lines.reduce((a, l) => a + l.s * fs * LH, 0);
+    fs *= Math.min(CW * (aspect < 1 ? 0.9 : 0.84) / maxW, CH * 0.6 / totH);
+    octx.fillStyle = '#fff'; octx.textAlign = 'center'; octx.textBaseline = 'middle';
+    const bands = [];
+    let y = CH / 2 - (totH * fs / 100) / 2;
+    lines.forEach(l => {
+      const z = fs * l.s; octx.font = `italic 600 ${z}px ${FONT}`;
+      const w = octx.measureText(l.t).width;
+      bands.push({ y0: y, y1: y + z * LH, x0: CW / 2 - w / 2, w });
+      octx.fillText(l.t, CW / 2, y + z * LH / 2 + z * 0.04);
+      y += z * LH;
+    });
+    const data = octx.getImageData(0, 0, CW, CH).data;
+    const px = [], py = [], po = [];
+    for (let yy = 0; yy < CH; yy += 2) for (let xx = 0; xx < CW; xx += 2) {
+      if (data[(yy * CW + xx) * 4] > 130) {
+        px.push(xx); py.push(yy);
+        let li = 0; for (let b = 0; b < bands.length; b++) if (yy >= bands[b].y0 && yy < bands[b].y1) { li = b; break; }
+        const B = bands[li];
+        po.push((li + Math.min(1, Math.max(0, (xx - B.x0) / B.w))) / bands.length);
+      }
+    }
+    const M = px.length;
+    const idx = new Uint32Array(M); for (let i = 0; i < M; i++) idx[i] = i;
+    for (let i = M - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; const t = idx[i]; idx[i] = idx[j]; idx[j] = t; }
+    const vh = visH(), vw = vh * aspect, k = vw / CW;
+    const out = new Float32Array(N * 3), ord = new Float32Array(N);
+    let c = 0;
+    for (let i = 0; i < N; i++) {
+      if (M && Math.random() < 0.85) {
+        const s = idx[c++ % M];
+        out[i*3] = (px[s] / CW - 0.5) * vw + (Math.random() - .5) * k * 2.2;
+        out[i*3+1] = -(py[s] / CH - 0.5) * vh + (Math.random() - .5) * k * 2.2;
+        out[i*3+2] = (Math.random() - .5) * 0.14;
+        ord[i] = po[s];
+      } else { halo(out, i, vh, vw); ord[i] = Math.random(); }
+    }
+    return { pos: out, ord };
+  }
+
+  function heart() {
+    const vh = visH(), vw = vh * aspect, out = new Float32Array(N * 3);
+    const sc = Math.min(vh * 0.52 / 2.3, vw * 0.72 / 2.4);
+    const T = 0.42;
+    for (let i = 0; i < N; i++) {
+      const r0 = Math.random();
+      if (r0 < 0.1) { halo(out, i, vh, vw); continue; }
+      // implicit heart: (x²+y²-1)³ - x²y³ <= 0
+      let x, y, f;
+      do {
+        x = (Math.random() * 2 - 1) * 1.16; y = -1.02 + Math.random() * 2.3;
+        const a = x * x + y * y - 1; f = a * a * a - x * x * y * y * y;
+      } while (f > 0);
+      const depth = T * Math.pow(-f, 0.25);
+      const z = r0 < 0.82 ? (Math.random() < .5 ? -1 : 1) * depth : (Math.random() * 2 - 1) * depth;
+      out[i*3] = x * sc;
+      out[i*3+1] = (y - 0.12) * sc;
+      out[i*3+2] = z * sc;
+    }
+    return { pos: out, ord: null };
+  }
+
+  function scatter() {
+    const vh = visH(), out = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) {
+      const u = Math.random() * 2 - 1, th = Math.random() * 6.283, q = Math.sqrt(1 - u * u);
+      const d = vh * (0.12 + Math.pow(Math.random(), 1.5) * 0.5);
+      out[i*3] = base[i*3] * 0.55 + Math.cos(th) * q * d * aspect;
+      out[i*3+1] = base[i*3+1] * 0.55 + Math.sin(th) * q * d;
+      out[i*3+2] = base[i*3+2] + u * d * 0.9 - 1;
+    }
+    return { pos: out, ord: null };
+  }
+
+  /* ---------- tween ---------- */
+  const now = () => performance.now() / 1000;
+  const tw = { start: -99, dur: 1 };
+  function goTo(target, dur, stagger, arcAmt) {
+    from.set(base); to.set(target.pos);
+    const vh = visH();
+    for (let i = 0; i < N; i++) {
+      delay[i] = target.ord ? stagger * (0.82 * target.ord[i] + 0.18 * Math.random()) : stagger * Math.random();
+      const a = arcAmt * vh * 0.12 * (0.3 + Math.random());
+      arc[i*3] = (Math.random() - .5) * a; arc[i*3+1] = (Math.random() - .5) * a; arc[i*3+2] = (Math.random() - .5) * a * 1.4;
+    }
+    tw.start = now(); tw.dur = RM ? Math.min(dur, 1.6) : dur;
+    if (RM) delay.fill(0);
+  }
+
+  let amp = 0.22, ampTarget = 0.22;
+  const fusionTw = { a: 0, b: 0, start: 0, dur: 1 };
+  function fuseTo(b, dur) { fusionTw.a = uniforms.uFusion.value; fusionTw.b = b; fusionTw.start = now(); fusionTw.dur = dur; }
+
+  /* ---------- pointer ---------- */
+  const ptr = { nx: 0, ny: 0, sx: 0, sy: 0, wx: 0, wy: 0, last: -99 };
+  addEventListener('pointermove', e => { ptr.nx = e.clientX / W * 2 - 1; ptr.ny = -(e.clientY / H) * 2 + 1; ptr.last = now(); }, { passive: true });
+  addEventListener('pointerdown', e => { ptr.nx = e.clientX / W * 2 - 1; ptr.ny = -(e.clientY / H) * 2 + 1; ptr.last = now(); }, { passive: true });
+  const ray = new THREE.Vector3();
+
+  /* ---------- state & timeline ---------- */
+  let stage = { type: 'clouds', k: 0 }, finale = false, token = 0;
+  let SHAPES = null;
+  function buildShapes() {
+    SHAPES = { far: clouds(false), near: clouds(true), phrases: PHRASES.map(phrase), heart: heart() };
+  }
+  const wait = s => new Promise(r => setTimeout(r, (RM ? Math.min(s, 2) : s) * 1000));
+
+  async function play() {
+    const my = ++token;
+    const alive = () => my === token;
+    stage = { type: 'clouds', k: 0 };
+    ampTarget = 0.2;
+    goTo(SHAPES.near, 6.5, 0.8, 0.6);
+    await wait(6.8); if (!alive()) return;
+    for (let k = 0; k < PHRASES.length; k++) {
+      stage = { type: 'phrase', k };
+      ampTarget = 0.012;
+      if (k === 2) fuseTo(1, 5.5);
+      goTo(SHAPES.phrases[k], 3.6, 2.4, k === 0 ? 1.4 : 1.1);
+      await wait(3.6 + 2.4 + PHRASES[k].hold); if (!alive()) return;
+      if (k < 2) {
+        stage = { type: 'scatter', k };
+        ampTarget = 0.14;
+        goTo(scatter(), 2.6, 0.9, 0.5);
+        await wait(3.1); if (!alive()) return;
+      }
+    }
+    stage = { type: 'heart', k: 0 };
+    finale = true; ampTarget = 0.03;
+    goTo(SHAPES.heart, 4.6, 1.6, 1.6);
+    await wait(7); if (!alive()) return;
+    $('end').hidden = false;
+  }
+
+  async function replay() {
+    const my = ++token;
+    $('end').hidden = true;
+    finale = false; fuseTo(0, 2.4); ampTarget = 0.2;
+    stage = { type: 'clouds', k: 0 };
+    goTo(SHAPES.far, 2.8, 0.8, 1.2);
+    await wait(3); if (my !== token) return;
+    play();
+  }
+
+  /* ---------- sizing ---------- */
+  function size_() {
+    W = innerWidth; H = innerHeight; aspect = W / H;
+    renderer.setSize(W, H, false);
+    camera.aspect = aspect; camera.updateProjectionMatrix();
+    uniforms.uScale.value = Math.min(4.4, Math.max(2.6, Math.min(W, H) / 900 * 4.2));
+  }
+  size_();
+  let rT;
+  addEventListener('resize', () => {
+    size_();
+    clearTimeout(rT);
+    rT = setTimeout(() => {
+      if (!SHAPES) return;
+      buildShapes();
+      const map = { clouds: SHAPES.near, phrase: SHAPES.phrases[stage.k], heart: SHAPES.heart };
+      if (map[stage.type]) goTo(map[stage.type], 1.4, 0.3, 0.2);
+    }, 220);
+  });
+
+  /* ---------- loop ---------- */
+  const ease = p => p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+  const beat = t => { const ph = (t % 1.25) / 1.25, g = (c, w) => Math.exp(-((ph - c) ** 2) / (2 * w * w)); return g(0.08, 0.035) + 0.55 * g(0.27, 0.04); };
+  let prev = now();
+
+  function frame() {
+    const t = now(), dt = Math.min(0.05, t - prev); prev = t;
+    uniforms.uTime.value = t;
+    amp += (ampTarget - amp) * Math.min(1, dt * 1.2);
+    const f = Math.min(1, Math.max(0, (t - fusionTw.start) / fusionTw.dur));
+    uniforms.uFusion.value = fusionTw.a + (fusionTw.b - fusionTw.a) * ease(f);
+
+    // camera drift + parallax
+    ptr.sx += (ptr.nx - ptr.sx) * 0.05; ptr.sy += (ptr.ny - ptr.sy) * 0.05;
+    const drift = RM ? 0 : 1;
+    camera.position.x += ((ptr.sx * 0.6 + Math.sin(t * 0.13) * 0.3) * drift - camera.position.x) * 0.04;
+    camera.position.y += ((ptr.sy * 0.4 + Math.cos(t * 0.11) * 0.2) * drift - camera.position.y) * 0.04;
+    camera.lookAt(0, 0, 0);
+    stars.rotation.z = t * 0.004;
+
+    // pointer in world (z = 0)
+    const touchOn = !finale && (t - ptr.last) < 1.6;
+    if (touchOn) {
+      ray.set(ptr.nx, ptr.ny, 0.5).unproject(camera).sub(camera.position).normalize();
+      const k = -camera.position.z / ray.z;
+      ptr.wx = camera.position.x + ray.x * k; ptr.wy = camera.position.y + ray.y * k;
+    }
+    const R = visH() * 0.1, R2 = R * R, push = visH() * 0.05;
+
+    // finale: heartbeat + slow turn
+    const rotTarget = finale ? Math.sin(t * 0.28) * 0.6 : 0;
+    points.rotation.y += (rotTarget - points.rotation.y) * 0.02;
+    points.rotation.x += ((finale ? 0.08 : 0) - points.rotation.x) * 0.02;
+    const sTarget = finale ? 1 + (RM ? 0 : 0.045 * beat(t)) : 1;
+    points.scale.setScalar(points.scale.x + (sTarget - points.scale.x) * 0.25);
+
+    const T0 = t - tw.start, D = tw.dur;
+    for (let i = 0; i < N; i++) {
+      const i3 = i * 3, i2 = i * 2;
+      let p = (T0 - delay[i]) / D; p = p < 0 ? 0 : p > 1 ? 1 : p;
+      const e = ease(p), s = Math.sin(Math.PI * p);
+      const bx = from[i3] + (to[i3] - from[i3]) * e + arc[i3] * s;
+      const by = from[i3+1] + (to[i3+1] - from[i3+1]) * e + arc[i3+1] * s;
+      const bz = from[i3+2] + (to[i3+2] - from[i3+2]) * e + arc[i3+2] * s;
+      base[i3] = bx; base[i3+1] = by; base[i3+2] = bz;
+
+      let tx = 0, ty = 0;
+      if (touchOn) {
+        const dx = bx - ptr.wx, dy = by - ptr.wy, d2 = dx * dx + dy * dy;
+        if (d2 < R2) { const d = Math.sqrt(d2) + 1e-4, q = 1 - d / R; tx = dx / d * q * q * push; ty = dy / d * q * q * push; }
+      }
+      disp[i2] += (tx - disp[i2]) * 0.09; disp[i2+1] += (ty - disp[i2+1]) * 0.09;
+
+      pos[i3]   = bx + Math.sin(t * freq[i3]   + phs[i3])   * amp + disp[i2];
+      pos[i3+1] = by + Math.sin(t * freq[i3+1] + phs[i3+1]) * amp + disp[i2+1];
+      pos[i3+2] = bz + Math.sin(t * freq[i3+2] + phs[i3+2]) * amp;
+    }
+    posAttr.needsUpdate = true;
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- boot ---------- */
+  function initialPlacement() {
+    const far = SHAPES.far.pos;
+    base.set(far); from.set(far); to.set(far); pos.set(far);
+    tw.start = -99;
+  }
+  const fontReady = document.fonts ? Promise.race([
+    document.fonts.load(`italic 600 80px "Cormorant Garamond"`), new Promise(r => setTimeout(r, 2500))
+  ]).catch(() => {}) : Promise.resolve();
+
+  // show clouds immediately, then rebuild text shapes once the font is in
+  buildShapes(); initialPlacement(); requestAnimationFrame(frame);
+  fontReady.then(() => {
+    buildShapes();
+    const btn = $('start'); btn.disabled = false;
+    btn.addEventListener('click', () => { $('overlay').classList.add('gone'); play(); });
+    if (location.hash === '#auto') { $('overlay').classList.add('gone'); play(); }
+  });
+  $('replay').addEventListener('click', replay);
+
+  const fsBtn = $('fs');
+  if (!document.fullscreenEnabled) fsBtn.hidden = true;
+  fsBtn.addEventListener('click', () => {
+    try {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      else document.documentElement.requestFullscreen().catch(() => {});
+    } catch (e) {}
+  });
+})();
+</script>
+
+</body>
+</html>
