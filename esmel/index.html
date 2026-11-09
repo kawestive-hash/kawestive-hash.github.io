@@ -27,15 +27,17 @@ body{background:var(--night);color:var(--ink);overflow:hidden;font-family:var(--
 #scene{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
 .vignette{position:fixed;inset:0;pointer-events:none;background:radial-gradient(120% 95% at 50% 46%,transparent 52%,rgba(0,0,0,.7) 100%)}
 
-.overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:22px;text-align:center;
-  padding-block:0 calc(11vh + env(safe-area-inset-bottom,0px));
+.overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:clamp(10px,2.2vh,20px);text-align:center;pointer-events:none;
+  padding-block:0 calc(clamp(20px,7vh,72px) + env(safe-area-inset-bottom,0px));
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
   transition:opacity 1.8s ease}
 .overlay.gone{opacity:0;pointer-events:none}
 .eyebrow{font:500 11px/1 var(--sans);letter-spacing:.34em;text-transform:uppercase;color:var(--ink-dim);margin:0}
-h1{margin:0;font:italic 500 clamp(52px,10vw,104px)/.95 var(--serif);text-wrap:balance;
+.overlay .btn{pointer-events:auto}
+h1{margin:0;font:italic 500 clamp(40px,min(9vw,11vh),96px)/.95 var(--serif);text-wrap:balance;
   background:linear-gradient(95deg,var(--blue) 0%,var(--ink) 48%,var(--rose) 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
-.hint{margin:0;max-width:34ch;font:italic 500 19px/1.4 var(--serif);color:var(--ink-dim)}
+.hint{margin:0;max-width:30ch;font:italic 500 clamp(16px,2.2vh,19px)/1.35 var(--serif);color:var(--ink-dim);text-wrap:balance}
+@media (max-height:520px){.hint{display:none}.overlay{gap:10px}}
 
 .btn{font:500 12px/1 var(--sans);letter-spacing:.28em;text-transform:uppercase;color:var(--ink);
   background:rgba(244,234,217,.04);border:1px solid var(--line);border-radius:999px;padding:16px 34px;cursor:pointer;
@@ -54,6 +56,10 @@ h1{margin:0;font:italic 500 clamp(52px,10vw,104px)/.95 var(--serif);text-wrap:ba
   width:42px;height:42px;border-radius:50%;display:grid;place-items:center;cursor:pointer;
   background:rgba(244,234,217,.03);border:1px solid rgba(244,234,217,.16);color:var(--ink-dim);transition:color .3s,border-color .3s}
 .icon:hover{color:var(--ink);border-color:var(--line)}
+#snd{right:calc(66px + env(safe-area-inset-right,0px))}
+#snd .off{display:none}
+#snd[aria-pressed="true"] .on{display:none}
+#snd[aria-pressed="true"] .off{display:inline}
 .icon svg{width:16px;height:16px}
 
 .fallback{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:26px;text-align:center;
@@ -72,7 +78,7 @@ h1{margin:0;font:italic 500 clamp(52px,10vw,104px)/.95 var(--serif);text-wrap:ba
 <div class="overlay" id="overlay">
   <p class="eyebrow">Une lettre en lumière</p>
   <h1>Pour toi</h1>
-  <p class="hint">Laisse les mots s’écrire. Effleure-les du doigt quand ils apparaissent.</p>
+  <p class="hint">Monte le son, et effleure les mots du doigt quand ils apparaissent.</p>
   <button class="btn" id="start" type="button" disabled>Ouvrir</button>
 </div>
 
@@ -80,6 +86,9 @@ h1{margin:0;font:italic 500 clamp(52px,10vw,104px)/.95 var(--serif);text-wrap:ba
   <button class="btn" id="replay" type="button">Revoir</button>
 </div>
 
+<button class="icon" id="snd" type="button" aria-label="Couper le son" aria-pressed="false" title="Son" hidden>
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6h2.5L8 3v10L4.5 10H2z"/><path class="on" d="M10.5 5.5a3.5 3.5 0 0 1 0 5M12.5 3.5a6.3 6.3 0 0 1 0 9"/><path class="off" d="M11 6l4 4M15 6l-4 4"/></svg>
+</button>
 <button class="icon" id="fs" type="button" aria-label="Plein écran" title="Plein écran">
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M1.5 5.5v-4h4M10.5 1.5h4v4M14.5 10.5v4h-4M5.5 14.5h-4v-4"/></svg>
 </button>
@@ -220,12 +229,14 @@ h1{margin:0;font:italic 500 clamp(52px,10vw,104px)/.95 var(--serif);text-wrap:ba
 
   function clouds(near) {
     const vh = visH(), vw = vh * aspect, out = new Float32Array(N * 3);
+    // side by side on every screen; before opening they sit in the upper half, clear of the title
     const portrait = aspect < 0.9;
-    const d = (near ? 0.17 : 0.29) * (portrait ? vh : vw);
-    const R = Math.min(vh, vw) * (portrait ? 0.24 : 0.19);
+    const d = (near ? 0.15 : (portrait ? 0.23 : 0.26)) * vw;
+    const R = portrait ? vw * 0.16 : Math.min(vh * 0.17, vw * 0.15);
+    const lift = near ? 0 : vh * 0.16;
     for (let i = 0; i < N; i++) {
       const s = (i & 1) ? 1 : -1;
-      const cx = portrait ? 0 : s * d, cy = portrait ? -s * d : 0;
+      const cx = s * d, cy = lift;
       const u = Math.random() * 2 - 1, th = Math.random() * 6.283, rr = R * Math.pow(Math.random(), 1.7);
       const q = Math.sqrt(1 - u * u);
       // gentle spiral: angle twists with radius
@@ -347,6 +358,116 @@ h1{margin:0;font:italic 500 clamp(52px,10vw,104px)/.95 var(--serif);text-wrap:ba
   addEventListener('pointerdown', e => { ptr.nx = e.clientX / W * 2 - 1; ptr.ny = -(e.clientY / H) * 2 + 1; ptr.last = now(); }, { passive: true });
   const ray = new THREE.Vector3();
 
+  /* ---------- sound (generated live, no audio files) ---------- */
+  let audio = null;
+  function makeAudio() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    const ctx = new AC();
+    const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+    const master = ctx.createGain(); master.gain.value = 0;
+    const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 3;
+    master.connect(comp); comp.connect(ctx.destination);
+
+    const conv = ctx.createConvolver();
+    const len = Math.floor(ctx.sampleRate * 4.8), ir = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.8); }
+    conv.buffer = ir;
+    const wet = ctx.createGain(); wet.gain.value = 0.6; conv.connect(wet); wet.connect(master);
+    const dry = ctx.createGain(); dry.gain.value = 0.55; dry.connect(master);
+    const bus = ctx.createGain(); bus.connect(dry); bus.connect(conv);
+    const bells = ctx.createGain(); bells.gain.value = 0.9; bells.connect(conv); bells.connect(dry);
+
+    const padF = ctx.createBiquadFilter(); padF.type = 'lowpass'; padF.frequency.value = 650; padF.Q.value = 0.5; padF.connect(bus);
+    const lfo = ctx.createOscillator(), lfoG = ctx.createGain(); lfo.frequency.value = 0.07; lfoG.gain.value = 180;
+    lfo.connect(lfoG); lfoG.connect(padF.frequency); lfo.start();
+
+    const noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 3, ctx.sampleRate);
+    { const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+
+    // D major colours: Dmaj9, Bm9, Gmaj9, A6/9
+    const CHORDS = [[50, 57, 61, 64, 66], [47, 54, 57, 61, 62], [43, 50, 54, 57, 59], [45, 52, 54, 59, 61]];
+    const BELLS = [74, 76, 78, 81, 83, 86, 88, 90];
+    let ci = 0, nextChord = 0;
+    const CH = 8;
+
+    function voice(m, t, dur, level) {
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(level, t + 2.8);
+      g.gain.setValueAtTime(level, t + dur);
+      g.gain.linearRampToValueAtTime(0, t + dur + 3.6);
+      g.connect(padF);
+      [-7, 7].forEach(cents => {
+        const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = mtof(m); o.detune.value = cents;
+        o.connect(g); o.start(t); o.stop(t + dur + 3.8);
+      });
+    }
+    function chord(t) {
+      const c = CHORDS[ci++ % CHORDS.length];
+      c.forEach((m, k) => voice(m, t, CH, k === 0 ? 0.05 : 0.03));
+      voice(c[0] - 12, t, CH, 0.045);
+    }
+    function bell(m, t, v) {
+      const f = mtof(m), g = ctx.createGain();
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.6);
+      g.connect(bells);
+      [[1, 1], [2.76, 0.28], [5.4, 0.08]].forEach(([r, a]) => {
+        const o = ctx.createOscillator(), og = ctx.createGain(); o.type = 'sine'; o.frequency.value = f * r; og.gain.value = a;
+        o.connect(og); og.connect(g); o.start(t); o.stop(t + 2.7);
+      });
+    }
+    const tick = setInterval(() => {
+      if (ctx.state !== 'running') return;
+      while (nextChord < ctx.currentTime + 1.2) { chord(Math.max(nextChord, ctx.currentTime + 0.05)); nextChord += CH; }
+    }, 400);
+
+    return {
+      ctx,
+      open() {
+        ctx.resume && ctx.resume();
+        const t = ctx.currentTime;
+        nextChord = t + 0.1;
+        master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(0, t); master.gain.linearRampToValueAtTime(0.9, t + 3.5);
+        bell(81, t + 0.4, 0.06); bell(86, t + 1.1, 0.05);
+      },
+      // little bells while the words are written, rising left to right
+      sparkle(delay, span, count) {
+        const t0 = ctx.currentTime + delay;
+        for (let i = 0; i < count; i++) {
+          const p = i / (count - 1);
+          const m = BELLS[Math.min(BELLS.length - 1, Math.floor(p * 5 + Math.random() * 3))];
+          bell(m, t0 + p * span + Math.random() * 0.12, 0.035 + Math.random() * 0.03);
+        }
+      },
+      whoosh(dur) {
+        const t = ctx.currentTime, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+        s.buffer = noiseBuf; f.type = 'bandpass'; f.Q.value = 1.2;
+        f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(2400, t + dur * 0.5); f.frequency.exponentialRampToValueAtTime(500, t + dur);
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.07, t + dur * 0.4); g.gain.linearRampToValueAtTime(0, t + dur);
+        s.connect(f); f.connect(g); g.connect(bus); s.start(t); s.stop(t + dur + 0.1);
+      },
+      swell(on, dur) {
+        const t = ctx.currentTime;
+        padF.frequency.cancelScheduledValues(t); padF.frequency.setValueAtTime(padF.frequency.value, t);
+        padF.frequency.linearRampToValueAtTime(on ? 1700 : 650, t + dur);
+      },
+      thump(at, strength) {
+        const t = ctx.currentTime + at, o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'sine'; o.frequency.setValueAtTime(78, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.16);
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.5 * strength, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.38);
+        o.connect(g); g.connect(dry); o.start(t); o.stop(t + 0.4);
+      },
+      mute(m) {
+        const t = ctx.currentTime;
+        master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value, t);
+        master.gain.linearRampToValueAtTime(m ? 0 : 0.9, t + 0.6);
+      },
+      stop() { clearInterval(tick); }
+    };
+  }
+  let heartSoundFrom = Infinity, lastBeatPh = 0;
+
   /* ---------- state & timeline ---------- */
   let stage = { type: 'clouds', k: 0 }, finale = false, token = 0;
   let SHAPES = null;
@@ -365,19 +486,23 @@ h1{margin:0;font:italic 500 clamp(52px,10vw,104px)/.95 var(--serif);text-wrap:ba
     for (let k = 0; k < PHRASES.length; k++) {
       stage = { type: 'phrase', k };
       ampTarget = 0.012;
-      if (k === 2) fuseTo(1, 5.5);
+      if (k === 2) { fuseTo(1, 5.5); audio && audio.swell(true, 5.5); }
       goTo(SHAPES.phrases[k], 3.6, 2.4, k === 0 ? 1.4 : 1.1);
+      audio && audio.sparkle(2.2, 3.6, k === 2 ? 16 : 12);
       await wait(3.6 + 2.4 + PHRASES[k].hold); if (!alive()) return;
       if (k < 2) {
         stage = { type: 'scatter', k };
         ampTarget = 0.14;
         goTo(scatter(), 2.6, 0.9, 0.5);
+        audio && audio.whoosh(2.6);
         await wait(3.1); if (!alive()) return;
       }
     }
     stage = { type: 'heart', k: 0 };
     finale = true; ampTarget = 0.03;
     goTo(SHAPES.heart, 4.6, 1.6, 1.6);
+    audio && audio.whoosh(4);
+    heartSoundFrom = now() + 4.5;
     await wait(7); if (!alive()) return;
     $('end').hidden = false;
   }
@@ -386,6 +511,7 @@ h1{margin:0;font:italic 500 clamp(52px,10vw,104px)/.95 var(--serif);text-wrap:ba
     const my = ++token;
     $('end').hidden = true;
     finale = false; fuseTo(0, 2.4); ampTarget = 0.2;
+    heartSoundFrom = Infinity; audio && audio.swell(false, 2.4);
     stage = { type: 'clouds', k: 0 };
     goTo(SHAPES.far, 2.8, 0.8, 1.2);
     await wait(3); if (my !== token) return;
@@ -407,7 +533,7 @@ h1{margin:0;font:italic 500 clamp(52px,10vw,104px)/.95 var(--serif);text-wrap:ba
     rT = setTimeout(() => {
       if (!SHAPES) return;
       buildShapes();
-      const map = { clouds: SHAPES.near, phrase: SHAPES.phrases[stage.k], heart: SHAPES.heart };
+      const map = { clouds: token > 0 ? SHAPES.near : SHAPES.far, phrase: SHAPES.phrases[stage.k], heart: SHAPES.heart };
       if (map[stage.type]) goTo(map[stage.type], 1.4, 0.3, 0.2);
     }, 220);
   });
@@ -447,6 +573,10 @@ h1{margin:0;font:italic 500 clamp(52px,10vw,104px)/.95 var(--serif);text-wrap:ba
     points.rotation.x += ((finale ? 0.08 : 0) - points.rotation.x) * 0.02;
     const sTarget = finale ? 1 + (RM ? 0 : 0.045 * beat(t)) : 1;
     points.scale.setScalar(points.scale.x + (sTarget - points.scale.x) * 0.25);
+    // heartbeat sound, locked to the visual pulse (lub at 0.08, dub at 0.27 of a 1.25 s cycle)
+    const bph = (t % 1.25) / 1.25;
+    if (audio && finale && t > heartSoundFrom && bph < lastBeatPh) { audio.thump(0.1, 1); audio.thump(0.3375, 0.6); }
+    lastBeatPh = bph;
 
     const T0 = t - tw.start, D = tw.dur;
     for (let i = 0; i < N; i++) {
@@ -489,10 +619,20 @@ h1{margin:0;font:italic 500 clamp(52px,10vw,104px)/.95 var(--serif);text-wrap:ba
   fontReady.then(() => {
     buildShapes();
     const btn = $('start'); btn.disabled = false;
-    btn.addEventListener('click', () => { $('overlay').classList.add('gone'); play(); });
+    btn.addEventListener('click', () => {
+      try { audio = makeAudio(); if (audio) { audio.open(); $('snd').hidden = false; } } catch (e) { audio = null; }
+      $('overlay').classList.add('gone'); play();
+    });
     if (location.hash === '#auto') { $('overlay').classList.add('gone'); play(); }
   });
-  $('replay').addEventListener('click', replay);
+  $('replay').addEventListener('click', () => { audio && audio.ctx.resume && audio.ctx.resume(); replay(); });
+  $('snd').addEventListener('click', e => {
+    if (!audio) return;
+    const b = e.currentTarget, m = b.getAttribute('aria-pressed') !== 'true';
+    b.setAttribute('aria-pressed', String(m));
+    b.setAttribute('aria-label', m ? 'Remettre le son' : 'Couper le son');
+    audio.mute(m);
+  });
 
   const fsBtn = $('fs');
   if (!document.fullscreenEnabled) fsBtn.hidden = true;
