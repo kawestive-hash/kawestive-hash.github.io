@@ -2,7 +2,10 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#020108">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
 <title>La lumière qui pousse</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,9 +14,10 @@
 @property --tint { syntax: '<color>'; inherits: true; initial-value: #120c38; }
 :root { --tint: #120c38; --ink: #f4eee6; --muted: rgba(244,238,230,.55); }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; background: #020108; color: var(--ink); overflow: hidden; }
+html, body { height: 100%; background: #020108; color: var(--ink); overflow: hidden; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+button { touch-action: manipulation; }
 body { font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-canvas#gl { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; touch-action: none; cursor: grab; }
+canvas#gl { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; height: 100dvh; display: block; touch-action: none; cursor: grab; }
 canvas#gl.drag { cursor: grabbing; }
 #tint { position: fixed; inset: 0; pointer-events: none; mix-blend-mode: screen; opacity: .55;
   background: radial-gradient(120% 70% at 50% 115%, var(--tint) 0%, transparent 62%);
@@ -22,12 +26,12 @@ canvas#gl.drag { cursor: grabbing; }
   background: radial-gradient(ellipse at center, transparent 48%, rgba(0,0,0,.72) 100%); }
 
 /* Intro */
-#intro { position: fixed; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px;
+#intro { position: fixed; inset: 0; display: grid; place-items: center; text-align: center; padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); overflow-y: auto;
   background: radial-gradient(ellipse at center, rgba(2,1,8,.15), rgba(2,1,8,.6));
   transition: opacity 2.4s ease, visibility 2.4s; z-index: 5; }
 #intro.gone { opacity: 0; visibility: hidden; }
 #intro .kicker { font-size: 11px; letter-spacing: .42em; text-transform: uppercase; color: var(--muted); margin-bottom: 26px; }
-#intro h1 { font-family: 'Cormorant Garamond', serif; font-weight: 300; font-size: clamp(44px, 8vw, 104px); line-height: .95; letter-spacing: -.01em; }
+#intro h1 { font-family: 'Cormorant Garamond', serif; font-weight: 300; font-size: clamp(40px, min(8vw, 13vh), 104px); line-height: .95; letter-spacing: -.01em; }
 #intro h1 em { font-style: italic; color: #f3cf9e; }
 #intro p { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: clamp(17px, 2vw, 21px); color: var(--muted); margin-top: 22px; }
 #enter { margin-top: 44px; font: 500 12px/1 'Inter', sans-serif; letter-spacing: .32em; text-transform: uppercase; color: var(--ink);
@@ -39,7 +43,7 @@ canvas#gl.drag { cursor: grabbing; }
 #intro small { display: block; margin-top: 18px; font-size: 11px; color: rgba(244,238,230,.35); letter-spacing: .08em; }
 
 /* Caption */
-#cap { position: fixed; left: 50%; bottom: clamp(92px, 15vh, 150px); transform: translateX(-50%); width: min(820px, 90vw); text-align: center; pointer-events: none; z-index: 3; }
+#cap { position: fixed; left: 50%; bottom: calc(clamp(92px, 15vh, 150px) + env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(820px, 90vw); text-align: center; pointer-events: none; z-index: 3; }
 #cap .num { font-size: 11px; letter-spacing: .46em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; opacity: 0; transition: opacity 1.6s ease; }
 #cap .line { font-family: 'Cormorant Garamond', serif; font-weight: 300; font-style: italic; font-size: clamp(21px, 2.7vw, 34px); line-height: 1.32; text-shadow: 0 2px 30px rgba(0,0,0,.85); }
 #cap .line span { display: inline-block; opacity: 0; filter: blur(8px); transform: translateY(10px); transition: opacity 1.4s ease, filter 1.6s ease, transform 1.6s ease; white-space: pre; }
@@ -48,24 +52,45 @@ canvas#gl.drag { cursor: grabbing; }
 #cap.out .num, #cap.out .line span { opacity: 0 !important; filter: blur(6px) !important; transition-duration: 1.1s !important; transition-delay: 0s !important; }
 
 /* Controls */
-#ui { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); display: flex; align-items: center; gap: 18px; z-index: 4;
+#ui { position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; gap: 18px; z-index: 4;
   opacity: 0; transition: opacity 1s ease; padding: 10px 18px; border-radius: 999px; background: rgba(8,6,20,.35); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(244,238,230,.08); }
 #ui.on { opacity: .6; }
 #ui.on:hover, #ui.on.awake { opacity: 1; }
-#ui button { background: none; border: 0; color: var(--ink); cursor: pointer; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; transition: background .3s; }
+#ui button { background: none; border: 0; color: var(--ink); cursor: pointer; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; transition: background .3s; }
 #ui button:hover { background: rgba(244,238,230,.1); }
 #ui svg { width: 16px; height: 16px; fill: currentColor; }
 #dots { display: flex; gap: 9px; }
-#dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(244,238,230,.25); cursor: pointer; transition: background .6s, transform .6s; }
+#dots i { position: relative; width: 6px; height: 6px; border-radius: 50%; background: rgba(244,238,230,.25); cursor: pointer; transition: background .6s, transform .6s; }
+#dots i::after { content: ''; position: absolute; inset: -9px -4px; }
 #dots i.on { background: #f3cf9e; transform: scale(1.35); }
-#hint { position: fixed; top: 22px; right: 26px; font-size: 11px; letter-spacing: .14em; color: rgba(244,238,230,.4); z-index: 4; opacity: 0; transition: opacity 1.5s; pointer-events: none; }
+#hint { position: fixed; top: calc(22px + env(safe-area-inset-top)); right: calc(26px + env(safe-area-inset-right)); font-size: 11px; letter-spacing: .14em; color: rgba(244,238,230,.4); z-index: 4; opacity: 0; transition: opacity 1.5s; pointer-events: none; }
 #hint.on { opacity: 1; }
 #bar { position: fixed; left: 0; bottom: 0; height: 2px; width: 0; background: linear-gradient(90deg, #6f8dff, #f3cf9e, #ff8fb0); opacity: .55; z-index: 4; }
-#replay { position: fixed; left: 50%; top: 18vh; transform: translateX(-50%); z-index: 4; font: 500 11px/1 'Inter', sans-serif; letter-spacing: .32em; text-transform: uppercase;
+#replay { position: fixed; left: 50%; top: calc(14vh + env(safe-area-inset-top)); transform: translateX(-50%); z-index: 4; font: 500 11px/1 'Inter', sans-serif; letter-spacing: .32em; text-transform: uppercase;
   color: var(--ink); background: rgba(8,6,20,.3); border: 1px solid rgba(244,238,230,.3); border-radius: 999px; padding: 14px 28px; cursor: pointer; opacity: 0; visibility: hidden; transition: opacity 1.6s, visibility 1.6s, background .4s; }
 #replay.on { opacity: 1; visibility: visible; }
 #replay:hover { background: rgba(244,238,230,.1); }
-@media (max-width: 640px) { #hint { top: auto; bottom: 74px; right: 0; left: 0; text-align: center; font-size: 10px; } #ui { gap: 12px; padding: 8px 12px; } #dots { gap: 7px; } }
+@media (max-width: 640px) {
+  #hint { top: calc(16px + env(safe-area-inset-top)); right: 0; left: 0; text-align: center; font-size: 10px; letter-spacing: .08em; padding: 0 16px; }
+  #ui { gap: 6px; padding: 6px 10px; } #dots { gap: 8px; margin: 0 4px; }
+  #cap { width: 92vw; }
+  #cap .num { font-size: 10px; letter-spacing: .34em; margin-bottom: 10px; }
+}
+@media (max-width: 360px) { #dots { display: none; } }
+/* téléphone à l'horizontale et écrans très bas */
+@media (max-height: 520px) {
+  #cap { bottom: calc(64px + env(safe-area-inset-bottom)); width: min(680px, 74vw); }
+  #cap .line { font-size: clamp(15px, 2.1vw, 19px); line-height: 1.28; }
+  #cap .num { margin-bottom: 6px; font-size: 9px; }
+  #ui { bottom: calc(10px + env(safe-area-inset-bottom)); padding: 4px 10px; }
+  #ui button { width: 30px; height: 30px; }
+  #hint { display: none; }
+  #intro .kicker { margin-bottom: 12px; } #intro p { margin-top: 10px; font-size: 15px; }
+  #enter { margin-top: 18px; padding: 13px 30px; } #intro small { margin-top: 10px; }
+  #replay { top: calc(8vh + env(safe-area-inset-top)); }
+}
+#nogl { position: fixed; inset: 0; display: none; place-items: center; text-align: center; padding: 32px; z-index: 9; background: #020108;
+  font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 22px; color: var(--muted); }
 </style>
 <script type="importmap">
 { "imports": {
@@ -75,6 +100,7 @@ canvas#gl.drag { cursor: grabbing; }
 </script>
 </head>
 <body>
+<div id="nogl">Cette expérience a besoin de WebGL, qui n’est pas disponible sur ce navigateur.<br>Essayez avec Chrome, Safari ou Firefox à jour.</div>
 <canvas id="gl" aria-label="Animation en particules"></canvas>
 <div id="tint"></div>
 <div id="vignette"></div>
@@ -109,8 +135,12 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 /* ---------------------------------------------------------------- setup */
-const isMobile = matchMedia('(max-width: 760px)').matches || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-const N = isMobile ? 40000 : 80000;
+const UA = navigator.userAgent;
+const isTablet = /iPad|Tablet/i.test(UA) || (/Macintosh/.test(UA) && navigator.maxTouchPoints > 1) || (/Android/i.test(UA) && !/Mobi/i.test(UA));
+const isPhone = !isTablet && (/Mobi|iPhone|iPod|Android/i.test(UA) || Math.min(screen.width, screen.height) < 600);
+const isMobile = isPhone || isTablet;
+const lowCores = (navigator.hardwareConcurrency || 8) <= 4;
+const N = isPhone ? (lowCores ? 28000 : 38000) : isTablet ? 56000 : 80000;
 document.getElementById('sub').textContent = `Sept tableaux, ${N.toLocaleString('fr-CA')} grains de lumière.`;
 
 const R = Math.random;
@@ -388,25 +418,25 @@ function sceneGalaxy() {
 }
 
 const CH = [
-  { num: 'I', name: 'La poussière', line: 'Au commencement, il n’y avait que la poussière des choses, et le silence entre elles.',
+  { num: 'I', name: 'La poussière', w: 12, line: 'Au commencement, il n’y avait que la poussière des choses, et le silence entre elles.',
     cam: [0, -0.6, 32], look: [0, -1.2, 0], sway: 0, swayBase: 0, pulse: 0, bloom: 1.0, turb: 1, tint: '#1a0f5a', hold: 6.5,
     chord: [110, 164.81, 246.94, 261.63] },
-  { num: 'II', name: 'La graine', line: 'Puis la poussière s’est souvenue de la lumière. Elle en a fait une graine.',
+  { num: 'II', name: 'La graine', w: 3.7, line: 'Puis la poussière s’est souvenue de la lumière. Elle en a fait une graine.',
     cam: [0, 0, 11], look: [0, -0.9, 0], sway: 0, swayBase: 0, pulse: 1, bloom: 1.25, turb: 0.9, tint: '#3a2108', hold: 6.5,
     chord: [87.31, 130.81, 164.81, 220] },
-  { num: 'III', name: 'L’arbre', line: 'La graine a poussé, lentement, comme on apprend à rester.',
+  { num: 'III', name: 'L’arbre', w: 7, line: 'La graine a poussé, lentement, comme on apprend à rester.',
     cam: [0, -0.4, 21], look: [0, -1.2, 0], sway: 1, swayBase: -4, pulse: 0, bloom: 1.0, turb: 0.4, tint: '#07362e', hold: 7.5,
     chord: [130.81, 196, 293.66, 329.63] },
-  { num: 'IV', name: 'Le monde', line: 'Autour de l’arbre, un monde s’est levé : des montagnes, des forêts, une rivière qui cherchait la mer.',
+  { num: 'IV', name: 'Le monde', w: 12.5, line: 'Autour de l’arbre, un monde s’est levé : des montagnes, des forêts, une rivière qui cherchait la mer.',
     cam: [0, 8, 27], look: [0, -3.6, -5], sway: 0, swayBase: 0, pulse: 0, bloom: 0.95, turb: 0.7, tint: '#141c5a', hold: 8.5,
     chord: [98, 146.83, 246.94, 329.63] },
-  { num: 'V', name: 'Les silhouettes', line: 'Dans ce monde, deux silhouettes. Chacune au bout de son horizon.',
+  { num: 'V', name: 'Les silhouettes', w: 7.3, line: 'Dans ce monde, deux silhouettes. Chacune au bout de son horizon.',
     cam: [0, 0.3, 15.5], look: [0, -1.2, 0], sway: 0, swayBase: 0, pulse: 0, bloom: 1.05, turb: 0.6, tint: '#0e1a44', hold: 7,
     chord: [110, 164.81, 261.63, 392] },
-  { num: 'VI', name: 'La rencontre', line: 'La distance n’était qu’un chemin pas encore parcouru. Quand leurs mains se sont trouvées, l’arbre a fleuri.',
+  { num: 'VI', name: 'La rencontre', w: 5.6, line: 'La distance n’était qu’un chemin pas encore parcouru. Quand leurs mains se sont trouvées, l’arbre a fleuri.',
     cam: [0, 0.2, 13.2], look: [0, -0.5, -1], sway: 1, swayBase: 1.2, pulse: 0, bloom: 1.15, turb: 0.22, tint: '#46112e', hold: 10,
     chord: [87.31, 130.81, 220, 329.63] },
-  { num: 'VII', name: 'La lumière', line: 'Puis tout est redevenu lumière. Deux étoiles, côte à côte, faites de la même poussière.',
+  { num: 'VII', name: 'La lumière', w: 13.5, line: 'Puis tout est redevenu lumière. Deux étoiles, côte à côte, faites de la même poussière.',
     cam: [0, 11, 28], look: [0, -2.6, 0], sway: 0, swayBase: 0, pulse: 0.6, bloom: 1.25, turb: 1.0, tint: '#221256', hold: 0,
     chord: [65.41, 196, 329.63, 587.33] },
 ];
@@ -415,8 +445,15 @@ const builders = [sceneDust, sceneSeed, sceneTree, sceneWorld, sceneApart, scene
 
 /* ---------------------------------------------------------------- renderer */
 const canvas = document.getElementById('gl');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
-const PR = Math.min(devicePixelRatio || 1, isMobile ? 1.5 : 2);
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' }); }
+catch (e) { document.getElementById('nogl').style.display = 'grid'; document.getElementById('intro').style.display = 'none'; throw e; }
+// plafond de pixels : un écran 4K ou une tablette Retina ne doivent pas étouffer la carte graphique
+const PR_MAX = Math.min(devicePixelRatio || 1, isPhone ? 1.5 : isTablet ? 1.5 : 2);
+const pixelBudget = isPhone ? 1.6e6 : isTablet ? 2.6e6 : 4.2e6;
+let quality = 1;   // baisse automatiquement si l'appareil peine
+const prFor = () => Math.max(0.6, Math.min(PR_MAX, Math.sqrt(pixelBudget / (innerWidth * innerHeight))) * quality);
+let PR = prFor();
 renderer.setPixelRatio(PR);
 renderer.setSize(innerWidth, innerHeight);
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x020108);
@@ -497,16 +534,26 @@ composer.addPass(new RenderPass(scene, camera));
 const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.0, 0.55, 0.0);
 composer.addPass(bloom);
 
+let capShift = 0;
 function resize() {
   const w = innerWidth, h = innerHeight;
+  PR = prFor(); renderer.setPixelRatio(PR); composer.setPixelRatio(PR);
   renderer.setSize(w, h); composer.setSize(w, h);
-  if (isMobile) bloom.resolution.set(w / 2, h / 2);
+  if (isMobile || quality < 1) bloom.resolution.set(w / 2, h / 2);
   camera.aspect = w / h; camera.updateProjectionMatrix();
   U.uAspect.value = w / h;
   U.uScale.value = 34 * PR * (h / 900) * (w / h < 0.8 ? 1.15 : 1);
   U.uMaxSize.value = 26 * PR;
+  // place réservée au texte : sur les écrans bas, on remonte l'image pour que la phrase ne couvre pas le sujet
+  const cs = getComputedStyle(document.getElementById('cap'));
+  const lineH = parseFloat(getComputedStyle(document.querySelector('#cap .line')).fontSize) * 1.32;
+  const capPx = parseFloat(cs.bottom) + lineH * 2.4 + 28;
+  capShift = Math.max(0, capPx / h - 0.29);
 }
-addEventListener('resize', resize); resize();
+let rzT; const onResize = () => { clearTimeout(rzT); rzT = setTimeout(resize, 120); };
+addEventListener('resize', onResize); addEventListener('orientationchange', onResize);
+if (window.visualViewport) visualViewport.addEventListener('resize', onResize);
+resize();
 
 /* ---------------------------------------------------------------- récit continu
    P est la position dans l'histoire : chaque tableau occupe une unité.
@@ -539,7 +586,7 @@ function snapshot() {
     sf[i] += (st[i] - sf[i]) * q;
   }
 }
-const PKEYS = ['sway', 'swayBase', 'pulse', 'bloom'];
+const PKEYS = ['sway', 'swayBase', 'pulse', 'bloom', 'w'];
 let curParams = null;
 function blend(a, b, e) {
   const o = { cam: [0, 0, 0], look: [0, 0, 0] };
@@ -668,6 +715,7 @@ function initAudio() {
     verb.buffer = buf; const vg = actx.createGain(); vg.gain.value = 0.85; verb.connect(vg); vg.connect(master);
     const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1100; lp.Q.value = 0.4;
     padBus = actx.createGain(); padBus.connect(lp); lp.connect(master); lp.connect(verb);
+    if (actx.state === 'suspended') actx.resume();
     setChord(CH[Math.max(activeIdx, 0)].chord); chime();
   } catch (e) { actx = null; }
 }
@@ -720,8 +768,20 @@ enter.onclick = () => {
 };
 
 const clock = new THREE.Clock();
+let fpsAcc = 0, fpsN = 0, fpsWait = 2.5;
+function watchFps(raw) {
+  if (document.hidden || raw > 0.5) return;
+  fpsWait -= raw; if (fpsWait > 0) return;
+  fpsAcc += raw; fpsN++;
+  if (fpsAcc > 2.5) {
+    const fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0;
+    if (fps < 42 && quality > 0.55) { quality = Math.max(0.55, quality * 0.8); resize(); fpsWait = 1.5; }
+    else if (fps > 58 && quality < 1) { quality = Math.min(1, quality * 1.12); resize(); fpsWait = 3; }
+  }
+}
 function frame() {
-  const dt = Math.min(clock.getDelta(), 0.05);
+  const raw = clock.getDelta(); watchFps(raw);
+  const dt = Math.min(raw, 0.05);
   now += dt; U.uTime.value += dt;
   U.uWaveAge.value = Math.min(U.uWaveAge.value + dt, 99);
   let pr;
@@ -770,7 +830,8 @@ function frame() {
   sph.setFromVector3(tmpO);
   sph.theta += uTheta + Math.sin(U.uTime.value * 0.06) * 0.22;
   sph.phi = clamp(sph.phi + uPhi + Math.sin(U.uTime.value * 0.045) * 0.03, 0.25, 2.7);
-  sph.radius *= zoom;
+  sph.radius *= zoom * Math.max(1, (pr.w * 1.08) / (0.4663 * camera.aspect * sph.radius));
+  tmpL.y -= capShift * 2 * sph.radius * 0.4663;
   tmpO.setFromSpherical(sph).add(tmpL);
   if (snapCam) { camPos.copy(tmpO); camLook.copy(tmpL); snapCam = false; }
   const kc = 1 - Math.exp(-dt * 1.6);
